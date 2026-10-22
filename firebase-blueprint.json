@@ -1,0 +1,100 @@
+{
+  "entities": {
+    "UserScript": {
+      "title": "UserScript",
+      "description": "A Python script file saved in the user's Thonny IDE workspace.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "File name such as script.py",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[a-zA-Z0-9_.\\- ]+$"
+        },
+        "path": {
+          "type": "string",
+          "description": "Simulated absolute file path in Thonny",
+          "minLength": 1,
+          "maxLength": 260
+        },
+        "content": {
+          "type": "string",
+          "description": "Python source code content",
+          "minLength": 0,
+          "maxLength": 100000
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the script owner",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp"
+        }
+      },
+      "required": ["title", "path", "content", "ownerId", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A single message in the Thonny Assistant conversation.",
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "Sender role",
+          "enum": ["user", "model"],
+          "maxLength": 16
+        },
+        "text": {
+          "type": "string",
+          "description": "Message markdown or code text",
+          "minLength": 1,
+          "maxLength": 50000
+        },
+        "model": {
+          "type": "string",
+          "description": "Gemini model used for this message",
+          "enum": ["gemini-4-argon", "gemini-3.8-flash", "gemini-3.1-flash-lite"],
+          "maxLength": 64
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the message owner",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp"
+        }
+      },
+      "required": ["role", "text", "model", "ownerId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/scripts/{scriptId}": {
+      "schema": {
+        "$ref": "#/entities/UserScript"
+      },
+      "description": "Stores user Python scripts synced with Thonny IDE."
+    },
+    "/chat_messages/{messageId}": {
+      "schema": {
+        "$ref": "#/entities/ChatMessage"
+      },
+      "description": "Stores user Gemini Assistant chat messages."
+    }
+  }
+}

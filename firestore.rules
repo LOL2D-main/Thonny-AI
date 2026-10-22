@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Reusable Hardened Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidUserScript(data) {
+      return data.keys().hasAll(['title', 'path', 'content', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['title', 'path', 'content', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 120 && data.title.matches('^[a-zA-Z0-9_.\\- ]+$')
+        && data.path is string && data.path.size() >= 1 && data.path.size() <= 260
+        && data.content is string && data.content.size() >= 0 && data.content.size() <= 100000
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['role', 'text', 'model', 'ownerId', 'createdAt'])
+        && data.keys().hasOnly(['role', 'text', 'model', 'ownerId', 'createdAt'])
+        && data.role is string && data.role.size() <= 16 && (data.role == 'user' || data.role == 'model')
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 50000
+        && data.model is string && data.model.size() <= 64 && (data.model == 'gemini-4-argon' || data.model == 'gemini-3.8-flash' || data.model == 'gemini-3.1-flash-lite')
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp;
+    }
+
+    // 4. Collection: /scripts/{scriptId}
+    match /scripts/{scriptId} {
+      allow get: if isVerifiedUser() && isValidId(scriptId) && existing().ownerId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(scriptId)
+        && isValidUserScript(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(scriptId)
+        && isValidUserScript(incoming())
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'path', 'content', 'updatedAt']);
+      allow delete: if isVerifiedUser() && isValidId(scriptId) && existing().ownerId == request.auth.uid;
+    }
+
+    // 5. Collection: /chat_messages/{messageId}
+    match /chat_messages/{messageId} {
+      allow get: if isVerifiedUser() && isValidId(messageId) && existing().ownerId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(messageId)
+        && isValidChatMessage(incoming())
+        && incoming().createdAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(messageId)
+        && isValidChatMessage(incoming())
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['text']);
+      allow delete: if isVerifiedUser() && isValidId(messageId) && existing().ownerId == request.auth.uid;
+    }
+  }
+}
